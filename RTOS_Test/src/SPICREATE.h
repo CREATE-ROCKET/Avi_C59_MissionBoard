@@ -50,6 +50,9 @@ namespace arduino
                     void IRAM_ATTR transmit(spi_transaction_t *transaction, int deviceHandle);
 
                     void IRAM_ATTR pollTransmit(spi_transaction_t *transaction, int deviceHandle);
+                    
+                    void IRAM_ATTR queueTransmit(spi_transaction_t *transaction, int deviceHandle);
+                    int IRAM_ATTR queueResult(spi_transaction_t **transaction, int deviceHandle);
                 };
             } // dma
         }     // spi

@@ -138,4 +138,19 @@ void SPICreate::pollTransmit(spi_transaction_t *transaction, int deviceHandle)
     spi_device_polling_transmit(handle[deviceHandle], transaction);
     return;
 }
+void SPICreate::queueTransmit(spi_transaction_t *transaction, int deviceHandle){
+    spi_device_queue_trans(handle[deviceHandle],transaction,10);
+}
+int SPICreate::queueResult(spi_transaction_t **transaction, int deviceHandle){
+    while(true){
+        esp_err_t e = spi_device_get_trans_result(handle[deviceHandle],transaction,10);
+        if(e == ESP_OK){
+            return 0;
+        }
+        else if(e==ESP_ERR_NOT_SUPPORTED || e==ESP_ERR_INVALID_ARG){
+            return -1;
+        }
+    }
+    
+}
 SPICREATE_END

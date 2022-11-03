@@ -19,9 +19,11 @@ using namespace arduino::esp32::spi::dma;
 
 class Flash
 {
+private:
     int CS;
     int deviceHandle{-1};
     SPICREATE::SPICreate *flashSPI;
+    spi_transaction_ext_t spi_transaction_queue = {};
 
 public:
     uint32_t currentAdd;
@@ -36,6 +38,8 @@ public:
 
     void write(uint32_t addr, uint8_t *tx);
     void read(uint32_t addr, uint8_t *rx);
+
+    void wait();
 };
 
 void Flash::begin(SPICREATE::SPICreate *targetSPI, int cs, uint32_t freq)
@@ -150,12 +154,12 @@ void IRAM_ATTR Flash::write(uint32_t addr, uint8_t *tx)
     comm.tx_buffer = tx;
     comm.user = (void *)&CS;
 
-    spi_transaction_ext_t spi_transaction = {};
-    spi_transaction.base = comm;
-    spi_transaction.command_bits = 8;
-    spi_transaction.address_bits = 24;
+    spi_transaction_queue.base = comm;
+    spi_transaction_queue.command_bits = 8;
+    spi_transaction_queue.address_bits = 24;
 
-    flashSPI->transmit((spi_transaction_t *)&spi_transaction, deviceHandle);
+    // flashSPI->transmit((spi_transaction_t *)&spi_transaction_queue, deviceHandle);
+    flashSPI->queueTransmit((spi_transaction_t *)&spi_transaction_queue, deviceHandle);
     return;
 }
 void Flash::read(uint32_t addr, uint8_t *rx)

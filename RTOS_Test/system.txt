@@ -1,0 +1,309 @@
+void IRAM_ATTR MainThread::processDebug(){
+    static int logIte = 0;
+
+    static double motor_angle = 0.; 
+    static double dt = 0.001;
+    static int pwm_ratio = 0;
+    static double MAX_V = 9.;
+    static char uart_TX_buf[14];
+
+    static double t = 0.;
+    static double f = 3.;
+    static double u = 0.; 
+
+    static int finish = 0;
+
+    if(Serial.available() && Serial.read() == 'c'){
+        logIte = 0;
+        state = 0;
+        Serial.println("Cancel logging and switch Phase0");
+#if SD_USE
+        SDIOLogWrapper::writeTaskDelete();
+        SDIOLogWrapper::closeFile();
+        SDIOLogWrapper::deinitSD();
+#endif
+        return;
+    }
+
+
+
+    if(logIte > 1000){
+        
+        double old_fin_angle = maxon.pre_rad;
+        motor_angle = maxon.rad;
+        t += (double)real_dt / 1000000.0;
+        u = sin(2.*M_PI*f*t);
+
+        if(t > 1./f){
+            t = 0.;
+            if(f < 1.) f+=0.1; 
+            else if(f < 10.) f+=1.;
+            else if(f < 100.) f+=10.;
+        }
+        if(f >= 100){ //100Hz�܂�
+            if(finish==0){
+                maxon.setSpeed(0);
+                Serial.println("finish");
+                finish = 1;
+            }
+            return;
+        }
+        // Serial.println(f);
+        maxon.setSpeed(u);
+    }
+    
+
+    logSD();
+
+    // static uint32_t time1 = 0;
+    // static uint32_t time2 = 0;
+    // static uint32_t time3 = 0;
+    // static uint32_t time4 = 0;
+
+    // uint32_t startTime = ESP.getCycleCount();
+    // double euler[3];
+
+    
+    // if(now - pre_now > 2500){
+    //     Serial.print("--------------------------\n\tover lap\t\n--------------------------\n");
+    //     Serial.println(time1);
+    //     Serial.println(time2);
+    //     Serial.println(time3);
+    //     Serial.println(time4);
+    //     Serial.println(now-pre_now);
+    //     digitalWrite(LEDPIN, HIGH);
+    // }
+
+    // GetData();
+
+    // time1 = ESP.getCycleCount() - startTime;
+
+    // q.update(mpuDataGyro,real_dt);// < 100us
+    // q.calc_Euler(euler);
+
+    
+    // time2 = ESP.getCycleCount() - startTime;
+
+    // logSD();
+
+    // time3 = ESP.getCycleCount() - startTime;
+
+
+    // if(logIte % 100 == 0){
+    //     digitalWrite(LEDPIN, LOW);
+    // }
+
+    logIte++;
+}
+
+void IRAM_ATTR MainThread::processDebug(){
+    static int logIte = 0;
+
+    static double old_fin_angle = 0;
+    static double fin_angle = 0;
+    
+    static double Voltage = 0;
+    static double fin_angle_r = 15.*M_PI/180.;
+
+    const double MAX_fin_angle = 14./180.*M_PI;
+    const double Kp = 240.0;
+    const double Kd = 1.8;
+    const double F = 50. * 2. * M_PI;
+   
+
+    if(Serial.available() && Serial.read() == 'c'){
+        logIte = 0;
+        state = 0;
+        Serial.println("Cancel logging and switch Phase0");
+#if SD_USE
+        SDIOLogWrapper::writeTaskDelete();
+        SDIOLogWrapper::closeFile();
+        SDIOLogWrapper::deinitSD();
+#endif
+        return;
+    }
+
+
+    maxon.update();
+    old_fin_angle = fin_angle;
+    fin_angle = maxon.rad;
+
+    // if (fin_angle_r > MAX_fin_angle){
+    //     fin_angle_r = MAX_fin_angle;
+    // }else if (fin_angle_r < -MAX_fin_angle){
+    //     fin_angle_r = -MAX_fin_angle;
+    // }
+
+    if(logIte > 1000){
+        double dt = (double)(real_dt) / 1000000.;
+        fin_dangle = (1. - dt * F) * fin_dangle + F * (fin_angle - old_fin_angle); //疑似微分で角速度 [rad/s]を計算
+        if (logIte == 0){
+            Voltage = (fin_angle_r - fin_angle) * Kp;
+        }else{
+            //Voltage = (fin_angle_r-fin_angle) * Kp +((fin_angle_r - old_fin_angle_r)/dt -  fin_dangle) * Kd; //指令電圧を計算 PD制御の場合
+            Voltage = (fin_angle_r-fin_angle)*Kp - fin_dangle * Kd;
+        }
+
+
+        if(Voltage > 0.01){
+            if(Voltage < 0.45){
+                Voltage += 0.45;
+            }
+        }else if(Voltage < -0.01){
+            if(Voltage > -0.45){
+                Voltage  -= 0.45;
+            }
+        }
+
+        if(Voltage > 10.)Voltage= 10.;
+        if(Voltage <  -10.)Voltage= -10.;
+        
+
+        if(logIte < 2000){
+            maxon.setSpeed(Voltage / 10.0);
+        }else if(logIte == 2000){
+            Serial.println("finish");
+            maxon.setSpeed(0);
+        }
+    }
+    logSD();
+
+
+    
+    
+    logIte++;
+}
+
+
+
+
+double fin_dangle = 0;
+void IRAM_ATTR MainThread::processDebug(){
+    const double M_PI_HALF = M_PI/2.;
+    const int mergeStop = 0;
+
+
+
+    static int logIte = 0;
+
+    static double old_fin_angle = 0;
+    
+    static double Voltage = 0;
+    // static double fin_angle_r = 0;
+    static double fin_angle = 0;
+    static double old_fin_angle_r = 0; 
+
+    static double psi_r = M_PI_HALF;
+
+
+
+    const double airSpd = 80.;
+    const double Acof = 0.00031777;// fin_angle_r = Mr / (Acof * airSpd * airSpd);
+    
+    const double KpA = 0.6;//Air Frame
+    const double KdA = 0.1;
+
+    const double MAX_fin_angle = 13./180.*M_PI;
+    const double KpM = 240.0;
+    const double KdM = 1.8;
+    const double F = 50. * 2. * M_PI;
+   
+
+    if(Serial.available() && Serial.read() == 'c'){
+        logIte = 0;
+        state = 0;
+        Serial.println("Cancel logging and switch Phase0");
+#if SD_USE
+        SDIOLogWrapper::writeTaskDelete();
+        SDIOLogWrapper::closeFile();
+        SDIOLogWrapper::deinitSD();
+#endif
+        return;
+    }
+
+
+    double dt = (double)(real_dt) / 1000000.;
+    GetData();
+    q.update(mpuDataGyro,real_dt);
+    q.calc_Euler(euler);//phi theta psi
+    calc_Euler_AngularVelocity();
+
+    double psi = euler[2];
+
+    
+
+
+    maxon.update();
+    old_fin_angle = fin_angle;
+    fin_angle = maxon.rad;
+
+    
+    if(logIte == 1000){  
+        if(psi > 0)
+            psi_r = M_PI_HALF;
+        else
+            psi_r = -M_PI_HALF;
+
+    } else if(logIte > 1000){
+        
+
+        if(psi_r == M_PI_HALF){
+            if(psi < -M_PI_HALF)psi += 2.* M_PI;
+        }else if(psi_r == -M_PI_HALF){
+            if(psi >  M_PI_HALF)psi -= 2.* M_PI;
+        }
+
+        //Controller
+        Mr = KpA * (psi_r - psi) - (KdA * dpsi);
+        fin_angle_r = Mr / (Acof * airSpd * airSpd);
+
+        //Limiter -13 degree ~ 13 degree
+        if (fin_angle_r > MAX_fin_angle){
+            fin_angle_r = MAX_fin_angle;
+        }else if (fin_angle_r < -MAX_fin_angle){
+            fin_angle_r = -MAX_fin_angle;
+        }
+
+
+
+        fin_dangle = (1. - dt * F) * fin_dangle + F * (fin_angle - old_fin_angle); //疑似微分で角速度 [rad/s]を計算
+
+        
+        if (logIte == 1001){
+            Voltage = (fin_angle_r - fin_angle) * KpM;
+        }else{
+            Voltage = (fin_angle_r - fin_angle) * KpM +((fin_angle_r - old_fin_angle_r)/dt -  fin_dangle) * KdM; //指令電圧を計算 PD制御の場合
+            // Voltage = (fin_angle_r-fin_angle)*KpM - fin_dangle * KdM;
+        }
+
+        //friction compensation
+        if(Voltage > 0.01){
+            if(Voltage < 0.45){
+                Voltage += 0.45;
+            }
+        }else if(Voltage < -0.01){
+            if(Voltage > -0.45){
+                Voltage  -= 0.45;
+            }
+        }
+
+        if(Voltage > 10.)Voltage= 10.;
+        if(Voltage <  -10.)Voltage= -10.;
+
+        old_fin_angle_r = fin_angle_r;
+        
+
+        if(logIte < 6000){
+            maxon.setSpeed(Voltage / 10.0);
+        }else if(logIte == 6000){
+            Serial.println("finish");
+            maxon.setSpeed(0);
+        }
+    }
+    logSD();
+
+
+    
+    
+    logIte++;
+}
