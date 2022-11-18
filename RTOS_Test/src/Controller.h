@@ -31,12 +31,13 @@ class Controller
         double KdM;
         double F;
 
+
         double dpsiFilter, Gpsi;
 
         double M_PI_HALF;
     
     public:
-        
+        double MAX_V;
         double fin_dangle, old_fin_angle, Voltage, fin_angle_r, old_fin_angle_r, psi_r, fin_angle, Mr;
         
         void start(double psi);
@@ -46,6 +47,7 @@ class Controller
     Controller(){
 
         Gpsi = 0.6141;
+        MAX_V = 10.;
         
         fin_dangle = 0;
         old_fin_angle = 0;
@@ -61,12 +63,12 @@ class Controller
 
         initPhase = 1;
         stopPhase = 1;
-        Acof = 0.00031777;// fin_angle_r = Mr / (Acof * airSpd * airSpd);
+        Acof = 0.00031999;// fin_angle_r = Mr / (Acof * airSpd * airSpd);
         
         KpA = 0.8;//Air Frame
-        KdA = 0.06;
+        KdA = 0.07;
 
-        MAX_fin_angle = 13./180.*M_PI;
+        MAX_fin_angle = 15./180.*M_PI;
         KpM = 240.0;
         KdM = 1.5;
         F = 50. * 2. * M_PI;
@@ -117,15 +119,12 @@ void IRAM_ATTR Controller::update(int real_dt, double psi, double dpsi, double a
         fin_angle_r = 0;
     }
 
-
     //Limiter -13 degree ~ 13 degree
     if (fin_angle_r > MAX_fin_angle){
         fin_angle_r = MAX_fin_angle;
     }else if (fin_angle_r < -MAX_fin_angle){
         fin_angle_r = -MAX_fin_angle;
     }
-
-
 
     fin_dangle = (1. - dt * F) * fin_dangle + F * (fin_angle - old_fin_angle); //疑似微分で角速度 [rad/s]を計算
 
@@ -140,19 +139,19 @@ void IRAM_ATTR Controller::update(int real_dt, double psi, double dpsi, double a
 
     //friction compensation
     if(Voltage > 0.05){
-        if(Voltage < 0.594){
-            Voltage = 0.594;
+        if(Voltage < 0.65){
+            Voltage = 0.65;
         }
     }else if(Voltage < -0.05){
-        if(Voltage > -0.594){
-            Voltage = -0.594;
+        if(Voltage > -0.65){
+            Voltage = -0.65;
         }
     }
 
 
     // Voltage limitation
-    if(Voltage > 10.)Voltage= 10.;
-    if(Voltage <  -10.)Voltage= -10.;
+    if(Voltage > MAX_V)Voltage = MAX_V;
+    if(Voltage <  -MAX_V)Voltage = -MAX_V;
 
     old_fin_angle_r = fin_angle_r;
 

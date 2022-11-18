@@ -20,8 +20,9 @@ public:
     uint16_t PitoRawData;
     double WindSpeed;
     double WindSpeedFiliter;
+    double MaxWindSpd, MinWindSpd;
     void begin(SPICREATE::SPICreate *targetSPI, int cs, uint32_t freq = 8000000, double alpha = 0.645, double beta = 1.117);
-    void Get(uint8_t *rx, int PlessureVal = 1013, double TemperatureVal = 14.5); // Oshima Nov. Average Temp.
+    void Get(uint8_t *rx, double PlessureVal = 1013, double TemperatureVal = 14.5); // Oshima Nov. Average Temp.
     // *** LITTLE ENDIAN ***
     // (uint32_t)rx[0] << 8 | (uint32_t)rx[1] means PITO raw data
 };
@@ -49,10 +50,14 @@ void PITOIC::begin(SPICREATE::SPICreate *targetSPI, int cs, uint32_t freq, doubl
     if_cfg.post_cb = csSet;
 
     deviceHandle = PITOICSPI->addDevice(&if_cfg, cs);
+
+    MaxWindSpd = 100.;
+    MinWindSpd = 20.;
+
     return;
 }
 
-void PITOIC::Get(uint8_t *rx, int PlessureVal, double TemperatureVal)
+void PITOIC::Get(uint8_t *rx, double PlessureVal, double TemperatureVal)
 {
     spi_transaction_t comm = {};
     comm.flags = SPI_TRANS_VARIABLE_CMD | SPI_TRANS_VARIABLE_ADDR;
@@ -70,7 +75,7 @@ void PITOIC::Get(uint8_t *rx, int PlessureVal, double TemperatureVal)
     PITOICSPI->transmit(NULL, rx, 2, deviceHandle);
 
     PitoRawData = rx[0] << 8 | rx[1];
-    double AirDensity = (double)PlessureVal / ((TemperatureVal + 273.5) * 2.87);
+    double AirDensity = PlessureVal / ((TemperatureVal + 273.5) * 2.87);
     double Speed_Calc_Buf = ((double)PitoRawData / 16384. * 100. - 10.) * 250. - 10000.;
     if (Speed_Calc_Buf < 0)
     {
@@ -80,6 +85,9 @@ void PITOIC::Get(uint8_t *rx, int PlessureVal, double TemperatureVal)
     WindSpeed = (double)Speed_Calc_Buf * constantValalpha + constantValbeta;
 
     WindSpeedFiliter = G * WindSpeedFiliter + (1. - G) * WindSpeed;
+
+    if(MinWindSpd > WindSpeedFiliter)WindSpeedFiliter = MinWindSpd;
+    if(MaxWindSpd < WindSpeedFiliter)WindSpeedFiliter = MaxWindSpd;
 
     return;
 }

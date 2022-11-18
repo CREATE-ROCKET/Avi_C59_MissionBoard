@@ -17,6 +17,8 @@ using namespace arduino::esp32::spi::dma;
 #define CMD_PP 0x02
 #define CMD_RDSR 0x05
 
+#define MAXPAGE 65535
+
 class Flash
 {
 private:
@@ -145,6 +147,8 @@ void IRAM_ATTR Flash::putInt(int *data,int size){
 
 void IRAM_ATTR Flash::write(uint32_t addr, uint8_t *tx)
 {
+
+    if((addr >> 8) > MAXPAGE)return;
     flashSPI->sendCmd(CMD_WREN, deviceHandle);
     spi_transaction_t comm = {};
     comm.flags = SPI_TRANS_VARIABLE_CMD | SPI_TRANS_VARIABLE_ADDR;
@@ -158,8 +162,8 @@ void IRAM_ATTR Flash::write(uint32_t addr, uint8_t *tx)
     spi_transaction_queue.command_bits = 8;
     spi_transaction_queue.address_bits = 24;
 
-    // flashSPI->transmit((spi_transaction_t *)&spi_transaction_queue, deviceHandle);
-    flashSPI->queueTransmit((spi_transaction_t *)&spi_transaction_queue, deviceHandle);
+    flashSPI->transmit((spi_transaction_t *)&spi_transaction_queue, deviceHandle);
+    // flashSPI->queueTransmit((spi_transaction_t *)&spi_transaction_queue, deviceHandle);
     return;
 }
 void Flash::read(uint32_t addr, uint8_t *rx)

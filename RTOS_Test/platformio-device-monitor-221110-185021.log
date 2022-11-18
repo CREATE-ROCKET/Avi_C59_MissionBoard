@@ -1,0 +1,11 @@
+E (4568) sdmmc_common: sdmmc_init_ocr: send_op_cond (1) returned 0x107
+E (4569) vfs_fat_sdmmc: sdmmc_card_init failed (0x107).
+[  4575][E][SD_MMC.cpp:84] begin(): Failed to initialize the card (263). Make sure SD card lines have pull-up resistors in place.
+1
+[  4597][E][vfs_api.cpp:22] open(): File system is not mounted
+Phase 0
+Phase 0
+Phase 0
+Phase 0
+Phase 0
+Phase 0

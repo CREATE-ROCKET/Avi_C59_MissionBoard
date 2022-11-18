@@ -33,10 +33,7 @@ private:
 public:
     int16_t cntRaw;
     double rad;
-    double pre_rad;
     double setSpd;
-
-
 
     void begin(int pwmA, int pwmB, int channelA, int channelB);
     void update();
@@ -47,6 +44,7 @@ void Motor::begin(int pwmA, int pwmB, int channelA, int channelB)
 {
     cntRaw = 0;
     rad = 0;
+    setSpd = 0;
     
     pcnt_config_A.pulse_gpio_num = channelA;//入力ピン(A)
     pcnt_config_A.ctrl_gpio_num = channelB;//制御ピン(B)
@@ -82,6 +80,7 @@ void Motor::begin(int pwmA, int pwmB, int channelA, int channelB)
 
     // pcnt_set_filter_value(PCNT_UNIT_0,50);
     // pcnt_filter_enable(PCNT_UNIT_0);
+    pcnt_counter_clear(PCNT_UNIT_0);
     pcnt_filter_disable(PCNT_UNIT_0);
 
     pcnt_counter_resume(PCNT_UNIT_0);//カウント開始
@@ -101,7 +100,6 @@ void Motor::begin(int pwmA, int pwmB, int channelA, int channelB)
 
 void IRAM_ATTR Motor::update()
 {
-    pre_rad = rad;
     pcnt_get_counter_value(PCNT_UNIT_0, &cntRaw);
     rad = -(double)(intr_count * 16384 + (int)cntRaw) / 59392.0 * 2.0 * 3.1416f;
    
